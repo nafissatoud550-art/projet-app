@@ -33,40 +33,116 @@ if (!$user_data) {
     exit();
 }
 
-// Statistiques pour le tableau de bord
-// Nombre total de produits
-$sql_produits = "SELECT COUNT(*) as total FROM produit";
-$result_produits = $conn->query($sql_produits);
-$total_produits = $result_produits ? $result_produits->fetch_assoc()['total'] : 0;
+// --- Statistiques globales ---
+$total_produits     = (int) ($conn->query("SELECT COUNT(*) t FROM produit")->fetch_assoc()['t'] ?? 0);
+$total_categories   = (int) ($conn->query("SELECT COUNT(*) t FROM categorie")->fetch_assoc()['t'] ?? 0);
+$total_fournisseurs = (int) ($conn->query("SELECT COUNT(*) t FROM fournisseur")->fetch_assoc()['t'] ?? 0);
+$total_approv       = (int) ($conn->query("SELECT COUNT(*) t FROM approvisionnement")->fetch_assoc()['t'] ?? 0);
 
-// Nombre total de catégories
-$sql_categories = "SELECT COUNT(*) as total FROM categorie";
-$result_categories = $conn->query($sql_categories);
-$total_categories = $result_categories ? $result_categories->fetch_assoc()['total'] : 0;
+// Valeur totale du stock
+$valeur_stock = (float) ($conn->query("SELECT COALESCE(SUM(quantite * prix_unitaire),0) v FROM produit")->fetch_assoc()['v'] ?? 0);
 
-// Nombre total de fournisseurs
-$sql_fournisseurs = "SELECT COUNT(*) as total FROM fournisseur";
-$result_fournisseurs = $conn->query($sql_fournisseurs);
-$total_fournisseurs = $result_fournisseurs ? $result_fournisseurs->fetch_assoc()['total'] : 0;
+// Répartition de l'état du stock
+$dist = $conn->query("SELECT
+        SUM(CASE WHEN quantite > stock_minimum THEN 1 ELSE 0 END) AS ok,
+        SUM(CASE WHEN quantite <= stock_minimum AND quantite > 0 THEN 1 ELSE 0 END) AS low,
+        SUM(CASE WHEN quantite <= 0 THEN 1 ELSE 0 END) AS rupture
+        FROM produit")->fetch_assoc();
+$nb_ok      = (int) ($dist['ok'] ?? 0);
+$nb_low     = (int) ($dist['low'] ?? 0);
+$nb_rupture = (int) ($dist['rupture'] ?? 0);
+$nb_alertes = $nb_low + $nb_rupture;
 
-// Nombre total d'approvisionnements
-$sql_approv = "SELECT COUNT(*) as total FROM approvisionnement";
-$result_approv = $conn->query($sql_approv);
-$total_approv = $result_approv ? $result_approv->fetch_assoc()['total'] : 0;
+// Produits par catégorie (top 6)
+$cat_data = [];
+$res = $conn->query("SELECT c.nom_categorie AS nom, COUNT(p.Id_produit) AS cnt
+        FROM categorie c LEFT JOIN produit p ON p.Id_categorie = c.Id_categorie
+        GROUP BY c.Id_categorie, c.nom_categorie
+        ORDER BY cnt DESC LIMIT 6");
+if ($res) {
+    while ($r = $res->fetch_assoc()) $cat_data[] = $r;
+}
+
+// Approvisionnements sur les 6 derniers mois
+$mois_data = [];
+$res = $conn->query("SELECT DATE_FORMAT(Date_approvisionnement,'%m/%y') AS mois, COUNT(*) AS cnt
+        FROM approvisionnement
+        GROUP BY YEAR(Date_approvisionnement), MONTH(Date_approvisionnement)
+        ORDER BY YEAR(Date_approvisionnement) DESC, MONTH(Date_approvisionnement) DESC
+        LIMIT 6");
+if ($res) {
+    while ($r = $res->fetch_assoc()) $mois_data[] = $r;
+}
+$mois_data = array_reverse($mois_data);
 
 // Produits avec stock bas
-$sql_stock_bas = "SELECT * FROM produit WHERE quantite <= stock_minimum ORDER BY quantite ASC LIMIT 5";
-$result_stock_bas = $conn->query($sql_stock_bas);
+$stock_bas = [];
+$res = $conn->query("SELECT nom_produit, quantite, stock_minimum
+        FROM produit WHERE quantite <= stock_minimum ORDER BY quantite ASC LIMIT 6");
+if ($res) {
+    while ($r = $res->fetch_assoc()) $stock_bas[] = $r;
+}
 
 // Derniers approvisionnements
-$sql_approvisionnements = "SELECT a.*, u.noms_utilisateur 
-                           FROM approvisionnement a 
-                           JOIN utilisateur u ON a.Id_utilisateur = u.Id_utilisateur 
-                           ORDER BY a.Date_approvisionnement DESC LIMIT 5";
-$result_approvisionnements = $conn->query($sql_approvisionnements);
+$dern_appro = [];
+$res = $conn->query("SELECT a.Id_approvisionnement, a.nom_approvisionnement, a.Date_approvisionnement, u.noms_utilisateur
+        FROM approvisionnement a
+        JOIN utilisateur u ON a.Id_utilisateur = u.Id_utilisateur
+        ORDER BY a.Date_approvisionnement DESC LIMIT 5");
+if ($res) {
+    while ($r = $res->fetch_assoc()) $dern_appro[] = $r;
+}
 
-// Fermer la connexion
 $conn->close();
+
+// --- Helpers d'affichage ---
+function pct($part, $total)
+{
+    return $total > 0 ? (int) round($part / $total * 100) : 0;
+}
+
+function render_ring($percent, $grad)
+{
+    $percent = max(0, min(100, (int) $percent));
+    echo '<div class="ring-center">';
+    echo '<svg class="ring" viewBox="0 0 36 36">';
+    echo '<circle class="ring-bg" cx="18" cy="18" r="15.9155"/>';
+    echo '<circle class="ring-val" stroke="url(#' . $grad . ')" cx="18" cy="18" r="15.9155" stroke-dasharray="' . $percent . ' 100"/>';
+    echo '</svg>';
+    echo '<span class="ring-text">' . $percent . '%</span>';
+    echo '</div>';
+}
+
+function render_gauge($percent, $grad, $label)
+{
+    $percent = max(0, min(100, (int) $percent));
+    $val = round($percent / 100 * 295.3, 1);
+    echo '<div class="gauge-wrap">';
+    echo '<svg class="gauge" viewBox="0 0 220 124">';
+    echo '<path class="gauge-bg" d="M16 112 A94 94 0 0 1 204 112"/>';
+    echo '<path class="gauge-val" stroke="url(#' . $grad . ')" d="M16 112 A94 94 0 0 1 204 112" stroke-dasharray="' . $val . ' 999"/>';
+    echo '</svg>';
+    echo '<div class="gauge-value">' . $percent . '%</div>';
+    echo '<div class="gauge-label">' . htmlspecialchars($label) . '</div>';
+    echo '</div>';
+}
+
+function icon($n)
+{
+    $p = [
+        'box'    => '<path d="M3 7.5l9-4.5 9 4.5v9l-9 4.5-9-4.5v-9z"/><path d="M3 7.5l9 4.5 9-4.5M12 21v-9"/>',
+        'tag'    => '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+        'truck'  => '<path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="7.5" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/>',
+        'wallet' => '<path d="M3 7h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a1 1 0 0 1-1-1V7z"/><path d="M16 12.5h2.5"/>',
+    ];
+    echo '<svg viewBox="0 0 24 24">' . ($p[$n] ?? '') . '</svg>';
+}
+
+$max_cat  = 1;
+foreach ($cat_data as $c) $max_cat = max($max_cat, (int) $c['cnt']);
+$max_mois = 1;
+foreach ($mois_data as $m) $max_mois = max($max_mois, (int) $m['cnt']);
+$bar_colors = ['blue', 'purple', 'orange', 'green', 'pink'];
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -75,345 +151,38 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tableau de Bord - Gestion de Stock</title>
-    <style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: #f0f2f5;
-        min-height: 100vh;
-    }
-
-    .navbar {
-        background: linear-gradient(135deg, #667eea 0%);
-        padding: 15px 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .navbar-brand {
-        color: white;
-        font-size: 24px;
-        font-weight: 600;
-        text-decoration: none;
-    }
-
-    .navbar-right {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        flex-wrap: wrap;
-    }
-
-    .navbar-right .user-info {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 14px;
-    }
-
-    .navbar-right .user-info strong {
-        color: white;
-    }
-
-    .btn-logout {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        padding: 8px 20px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-decoration: none;
-        font-size: 14px;
-    }
-
-    .btn-logout:hover {
-        background: rgba(255, 255, 255, 0.3);
-    }
-
-    .container {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 30px 20px;
-    }
-
-    .dashboard-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 30px;
-        flex-wrap: wrap;
-        gap: 15px;
-    }
-
-    .dashboard-header h1 {
-        font-size: 28px;
-        color: #333;
-    }
-
-    .dashboard-header p {
-        color: #666;
-        font-size: 14px;
-    }
-
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-
-    .stat-card {
-        background: white;
-        border-radius: 15px;
-        padding: 25px 20px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        transition: transform 0.3s ease;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-5px);
-    }
-
-    .stat-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        color: white;
-        flex-shrink: 0;
-    }
-
-    .stat-icon.blue {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-    }
-
-    .stat-icon.green {
-        background: linear-gradient(135deg, #11998e, #38ef7d);
-    }
-
-    .stat-icon.orange {
-        background: linear-gradient(135deg, #f093fb, #f5576c);
-    }
-
-    .stat-icon.purple {
-        background: linear-gradient(135deg, #4facfe, #00f2fe);
-    }
-
-    .stat-info h3 {
-        font-size: 26px;
-        color: #333;
-        margin-bottom: 3px;
-    }
-
-    .stat-info p {
-        color: #888;
-        font-size: 13px;
-        margin: 0;
-    }
-
-    .content-grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 30px;
-    }
-
-    @media (max-width: 992px) {
-        .content-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .card {
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        overflow: hidden;
-        margin-bottom: 30px;
-    }
-
-    .card-header {
-        padding: 18px 25px;
-        border-bottom: 1px solid #f0f0f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .card-header h3 {
-        font-size: 17px;
-        color: #333;
-    }
-
-    .card-header .badge {
-        background: #667eea;
-        color: white;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-    }
-
-    .card-body {
-        padding: 20px 25px;
-    }
-
-    .card-body .empty-message {
-        text-align: center;
-        color: #999;
-        padding: 30px 0;
-        font-size: 14px;
-    }
-
-    .table-responsive {
-        overflow-x: auto;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 14px;
-    }
-
-    table thead {
-        background: #f8f9fa;
-    }
-
-    table th {
-        padding: 10px 15px;
-        text-align: left;
-        color: #555;
-        font-weight: 600;
-        font-size: 12px;
-        text-transform: uppercase;
-        border-bottom: 2px solid #e9ecef;
-    }
-
-    table td {
-        padding: 10px 15px;
-        border-bottom: 1px solid #f0f0f0;
-        color: #333;
-    }
-
-    table tbody tr:hover {
-        background: #f8f9fa;
-    }
-
-    .status-badge {
-        padding: 3px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-        display: inline-block;
-    }
-
-    .status-badge.danger {
-        background: #f8d7da;
-        color: #721c24;
-    }
-
-    .quick-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-
-    .quick-action-btn {
-        padding: 15px;
-        border: 2px solid #e9ecef;
-        border-radius: 10px;
-        text-align: center;
-        text-decoration: none;
-        color: #555;
-        transition: all 0.3s ease;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 5px;
-        background: white;
-    }
-
-    .quick-action-btn:hover {
-        border-color: #667eea;
-        background: #f8f9ff;
-        transform: translateY(-2px);
-    }
-
-    .quick-action-btn .icon {
-        font-size: 22px;
-    }
-
-    .quick-action-btn .label {
-        font-size: 13px;
-        font-weight: 500;
-    }
-
-    .footer {
-        text-align: center;
-        padding: 20px;
-        margin-top: 30px;
-        color: #888;
-        font-size: 13px;
-        border-top: 1px solid #e9ecef;
-    }
-
-    @media (max-width: 768px) {
-        .navbar {
-            flex-direction: column;
-            text-align: center;
-        }
-
-        .navbar-right {
-            justify-content: center;
-        }
-
-        .dashboard-header {
-            flex-direction: column;
-            text-align: center;
-        }
-
-        .stats-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-
-        .quick-actions {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-    </style>
+    <link rel="stylesheet" href="assets/css/app.css">
 </head>
 
 <body>
+    <!-- Dégradés partagés pour les graphiques SVG -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#5eead4" /><stop offset="100%" stop-color="#18bfa4" />
+            </linearGradient>
+            <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#ffc46b" /><stop offset="100%" stop-color="#ff9a5a" />
+            </linearGradient>
+            <linearGradient id="gPink" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#fb7ba2" /><stop offset="100%" stop-color="#f5577c" />
+            </linearGradient>
+            <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#7cc3ff" /><stop offset="100%" stop-color="#4f9cf9" />
+            </linearGradient>
+            <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#c4b5fd" /><stop offset="100%" stop-color="#8b5cf6" />
+            </linearGradient>
+        </defs>
+    </svg>
+
     <!-- Navbar -->
     <nav class="navbar">
-        <a href="dashboard.php" class="navbar-brand">📦 Gestion de Stock</a>
+        <a href="dashboard.php" class="navbar-brand">Gestion de Stock</a>
         <div class="navbar-right">
             <span class="user-info">
                 Bienvenue,
                 <strong><?php echo htmlspecialchars($user_data['noms_utilisateur'] ?? 'Utilisateur'); ?></strong>
-                <span style="opacity:0.7;font-size:12px;margin-left:8px;">
-                    (<?php echo htmlspecialchars($user_data['role'] ?? 'employe'); ?>)
-                </span>
             </span>
             <a href="logout.php" class="btn-logout">Déconnexion</a>
         </div>
@@ -424,53 +193,148 @@ $conn->close();
         <!-- En-tête -->
         <div class="dashboard-header">
             <div>
-                <h1>📊 Tableau de Bord</h1>
+                <h1>Tableau de <strong>Bord</strong></h1>
                 <p>Vue d'ensemble de votre système de gestion de stock</p>
             </div>
+            <div class="badge-circle" title="Alertes de stock"><?php echo $nb_alertes; ?></div>
         </div>
 
-        <!-- Cartes statistiques -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon blue">📦</div>
-                <div class="stat-info">
-                    <h3><?php echo $total_produits; ?></h3>
-                    <p>Produits en stock</p>
+        <!-- Cartes KPI -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-top">
+                    <span class="kpi-label">Produits en stock</span>
+                    <span class="icon-chip blue"><?php icon('box'); ?></span>
                 </div>
+                <div class="kpi-value"><?php echo number_format($total_produits, 0, ',', ' '); ?></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon green">📊</div>
-                <div class="stat-info">
-                    <h3><?php echo $total_categories; ?></h3>
-                    <p>Catégories</p>
+            <div class="kpi-card">
+                <div class="kpi-top">
+                    <span class="kpi-label">Catégories</span>
+                    <span class="icon-chip purple"><?php icon('tag'); ?></span>
                 </div>
+                <div class="kpi-value"><?php echo number_format($total_categories, 0, ',', ' '); ?></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon orange">🏢</div>
-                <div class="stat-info">
-                    <h3><?php echo $total_fournisseurs; ?></h3>
-                    <p>Fournisseurs</p>
+            <div class="kpi-card">
+                <div class="kpi-top">
+                    <span class="kpi-label">Fournisseurs</span>
+                    <span class="icon-chip orange"><?php icon('truck'); ?></span>
                 </div>
+                <div class="kpi-value"><?php echo number_format($total_fournisseurs, 0, ',', ' '); ?></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon purple">📋</div>
-                <div class="stat-info">
-                    <h3><?php echo $total_approv; ?></h3>
-                    <p>Approvisionnements</p>
+            <div class="kpi-card">
+                <div class="kpi-top">
+                    <span class="kpi-label">Valeur du stock</span>
+                    <span class="icon-chip green"><?php icon('wallet'); ?></span>
+                </div>
+                <div class="kpi-value" style="font-size:24px;">
+                    <?php echo number_format($valeur_stock, 0, ',', ' '); ?>
+                    <span style="font-size:14px;color:var(--text-secondary);font-weight:600;">FCFA</span>
                 </div>
             </div>
         </div>
 
-        <!-- Contenu -->
-        <div class="content-grid">
-            <!-- Produits avec stock bas -->
+        <!-- État du stock : anneaux + jauge -->
+        <div class="row-2">
             <div class="card">
                 <div class="card-header">
-                    <h3>⚠️ Alertes Stock</h3>
-                    <span class="badge">Stock bas</span>
+                    <h3>Répartition du stock</h3>
+                    <span class="badge badge-primary">Total : <?php echo $total_produits; ?></span>
                 </div>
                 <div class="card-body">
-                    <?php if ($result_stock_bas && $result_stock_bas->num_rows > 0): ?>
+                    <div class="ring-set">
+                        <div class="ring-item">
+                            <?php render_ring(pct($nb_ok, $total_produits), 'gGreen'); ?>
+                            <div class="ring-caption">Stock sain<small><?php echo $nb_ok; ?> produits</small></div>
+                        </div>
+                        <div class="ring-item">
+                            <?php render_ring(pct($nb_low, $total_produits), 'gOrange'); ?>
+                            <div class="ring-caption">En alerte<small><?php echo $nb_low; ?> produits</small></div>
+                        </div>
+                        <div class="ring-item">
+                            <?php render_ring(pct($nb_rupture, $total_produits), 'gPink'); ?>
+                            <div class="ring-caption">Rupture<small><?php echo $nb_rupture; ?> produits</small></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Santé globale du stock</h3>
+                </div>
+                <div class="card-body">
+                    <?php render_gauge(pct($nb_ok, $total_produits), 'gGreen', 'Produits au-dessus du seuil minimum'); ?>
+                    <div class="legend">
+                        <span class="legend-item"><span class="legend-dot" style="background:var(--viz-green)"></span>Sain</span>
+                        <span class="legend-item"><span class="legend-dot" style="background:var(--viz-orange)"></span>Alerte</span>
+                        <span class="legend-item"><span class="legend-dot" style="background:var(--viz-pink)"></span>Rupture</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graphiques en barres -->
+        <div class="row-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Produits par catégorie</h3>
+                    <span class="badge">Top <?php echo count($cat_data); ?></span>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($cat_data)): ?>
+                    <div class="bar-chart">
+                        <?php foreach ($cat_data as $i => $c):
+                            $h = (int) round($c['cnt'] / $max_cat * 100);
+                            $col = $bar_colors[$i % count($bar_colors)];
+                        ?>
+                        <div class="bar-col">
+                            <span class="bar-val"><?php echo (int) $c['cnt']; ?></span>
+                            <div class="bar <?php echo $col; ?>" style="height: <?php echo max(4, $h); ?>%;"></div>
+                            <span class="bar-label"><?php echo htmlspecialchars($c['nom'] ?? '—'); ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php else: ?>
+                    <div class="empty-message">Aucune catégorie à afficher.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>Approvisionnements par mois</h3>
+                    <span class="badge">6 derniers</span>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($mois_data)): ?>
+                    <div class="bar-chart">
+                        <?php foreach ($mois_data as $m):
+                            $h = (int) round($m['cnt'] / $max_mois * 100);
+                        ?>
+                        <div class="bar-col">
+                            <span class="bar-val"><?php echo (int) $m['cnt']; ?></span>
+                            <div class="bar blue" style="height: <?php echo max(4, $h); ?>%;"></div>
+                            <span class="bar-label"><?php echo htmlspecialchars($m['mois']); ?></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php else: ?>
+                    <div class="empty-message">Aucun approvisionnement à afficher.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertes + actions rapides -->
+        <div class="content-grid">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Alertes de stock</h3>
+                    <span class="badge badge-warning"><?php echo $nb_alertes; ?> à surveiller</span>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($stock_bas)): ?>
                     <div class="table-responsive">
                         <table>
                             <thead>
@@ -482,90 +346,79 @@ $conn->close();
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php while ($row = $result_stock_bas->fetch_assoc()): ?>
+                                <?php foreach ($stock_bas as $row):
+                                    $rupture = ((int) $row['quantite'] <= 0);
+                                ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($row['nom_produit']); ?></td>
-                                    <td><strong><?php echo $row['quantite']; ?></strong></td>
-                                    <td><?php echo $row['stock_minimum']; ?></td>
+                                    <td><strong><?php echo (int) $row['quantite']; ?></strong></td>
+                                    <td><?php echo (int) $row['stock_minimum']; ?></td>
                                     <td>
-                                        <span class="status-badge danger">⚠️ Stock critique</span>
+                                        <span class="status-badge danger">
+                                            <span class="stock-dot red"></span>
+                                            <?php echo $rupture ? 'Rupture' : 'Stock bas'; ?>
+                                        </span>
                                     </td>
                                 </tr>
-                                <?php endwhile; ?>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
                     <?php else: ?>
-                    <div class="empty-message">✅ Tous les produits ont un stock suffisant.</div>
+                    <div class="empty-message">Tous les produits ont un stock suffisant.</div>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <!-- Actions rapides -->
             <div class="card">
                 <div class="card-header">
-                    <h3>⚡ Actions Rapides</h3>
+                    <h3>Actions rapides</h3>
                 </div>
                 <div class="card-body">
                     <div class="quick-actions">
-                        <a href="ajouter_produit.php" class="quick-action-btn">
-                            <span class="icon">➕</span>
-                            <span class="label">Ajouter un produit</span>
-                        </a>
-                        <a href="approvisionnement.php" class="quick-action-btn">
-                            <span class="icon">📦</span>
-                            <span class="label">Nouvel approvisionnement</span>
-                        </a>
-                        <a href="categorie.php" class="quick-action-btn">
-                            <span class="icon">📊</span>
-                            <span class="label">Gérer les catégories</span>
-                        </a>
-                        <a href="fournisseur.php" class="quick-action-btn">
-                            <span class="icon">🏢</span>
-                            <span class="label">Gérer les fournisseurs</span>
-                        </a>
-                        <a href="sortie.php" class="quick-action-btn">
-                            <span class="icon">📤</span>
-                            <span class="label">Gérer les sortie</span>
-                        </a>
+                        <a href="ajouter_produit.php" class="quick-action-btn">Ajouter un produit</a>
+                        <a href="approvisionnement.php" class="quick-action-btn">Approvisionnement</a>
+                        <a href="categorie.php" class="quick-action-btn">Catégories</a>
+                        <a href="fournisseur.php" class="quick-action-btn">Fournisseurs</a>
+                        <a href="sortie.php" class="quick-action-btn" style="grid-column:1 / -1;">Gérer les sorties</a>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Derniers approvisionnements -->
-            <div class="card" style="grid-column: 1 / -1;">
-                <div class="card-header">
-                    <h3>📋 Derniers Approvisionnements</h3>
-                    <span class="badge">Historique</span>
+        <!-- Derniers approvisionnements -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Derniers approvisionnements</h3>
+                <span class="badge">Historique</span>
+            </div>
+            <div class="card-body">
+                <?php if (!empty($dern_appro)): ?>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nom</th>
+                                <th>Date</th>
+                                <th>Utilisateur</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($dern_appro as $row): ?>
+                            <tr>
+                                <td><span class="badge badge-primary">#<?php echo (int) $row['Id_approvisionnement']; ?></span></td>
+                                <td><?php echo htmlspecialchars($row['nom_approvisionnement']); ?></td>
+                                <td><?php echo date('d/m/Y', strtotime($row['Date_approvisionnement'])); ?></td>
+                                <td><?php echo htmlspecialchars($row['noms_utilisateur']); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-                <div class="card-body">
-                    <?php if ($result_approvisionnements && $result_approvisionnements->num_rows > 0): ?>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Nom</th>
-                                    <th>Date</th>
-                                    <th>Utilisateur</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php while ($row = $result_approvisionnements->fetch_assoc()): ?>
-                                <tr>
-                                    <td>#<?php echo $row['Id_approvisionnement']; ?></td>
-                                    <td><?php echo htmlspecialchars($row['nom_approvisionnement']); ?></td>
-                                    <td><?php echo date('d/m/Y', strtotime($row['Date_approvisionnement'])); ?></td>
-                                    <td><?php echo htmlspecialchars($row['noms_utilisateur']); ?></td>
-                                </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php else: ?>
-                    <div class="empty-message">Aucun approvisionnement enregistré.</div>
-                    <?php endif; ?>
-                </div>
+                <?php else: ?>
+                <div class="empty-message">Aucun approvisionnement enregistré.</div>
+                <?php endif; ?>
             </div>
         </div>
 

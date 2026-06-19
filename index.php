@@ -18,15 +18,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $identifiant = trim($_POST['identifiant']);
     $mot_de_pass = trim($_POST['mot_de_pass']);
     $remember_me = isset($_POST['remember_me']) ? true : false;
-    
+
     if (!empty($identifiant) && !empty($mot_de_pass)) {
         // Requête préparée pour éviter les injections SQL (version MySQLi)
-        $sql = "SELECT * FROM utilisateur WHERE identifiant = ? AND statut = 'actif'";
+        $sql = "SELECT * FROM utilisateur WHERE identifiant = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("s", $identifiant);
         $stmt->execute();
         $result = $stmt->get_result();
-        
+
         if ($result->num_rows == 1) {
             $user = $result->fetch_assoc();
             // Vérifier le mot de passe (si haché, utilisez password_verify)
@@ -34,15 +34,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 // Connexion réussie
                 $_SESSION['user_id'] = $user['Id_utilisateur'];
                 $_SESSION['user_name'] = $user['prenom_utilisateur'] . ' ' . $user['nom_utilisateur'];
-                $_SESSION['user_role'] = $user['role'];
-                
+
                 // Si "Se souvenir de moi" est coché
                 if ($remember_me) {
                     $token = bin2hex(random_bytes(32));
                     setcookie('remember_token', $token, time() + (86400 * 30), "/"); // 30 jours
                     // Vous pouvez stocker ce token dans la base de données
                 }
-                
+
                 header("Location: dashboard.php");
                 exit();
             } else {
@@ -55,7 +54,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } else {
         $error_message = "Veuillez remplir tous les champs";
     }
-    
+
     $conn->close();
 }
 ?>
@@ -68,6 +67,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - Gestion de Stock</title>
     <style>
+    :root {
+        --bg: #e9edf5;
+        --well: #eef1f8;
+        --card: #ffffff;
+        --text: #2a3447;
+        --text-strong: #1b2538;
+        --text-secondary: #7a8699;
+        --muted: #9aa4b6;
+        --accent: #6366f1;
+        --accent-2: #818cf8;
+        --danger: #e11d48;
+        --radius: 20px;
+        --radius-sm: 12px;
+        --shadow-d: rgba(99, 116, 160, 0.22);
+        --shadow-l: rgba(255, 255, 255, 0.9);
+        --soft: 8px 8px 22px var(--shadow-d), -8px -8px 22px var(--shadow-l);
+        --soft-sm: 3px 3px 8px var(--shadow-d), -3px -3px 8px var(--shadow-l);
+        --soft-inset: inset 3px 3px 7px rgba(99, 116, 160, 0.20), inset -3px -3px 6px rgba(255, 255, 255, 0.85);
+    }
+
     * {
         margin: 0;
         padding: 0;
@@ -75,102 +94,109 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%);
+        font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg);
+        color: var(--text);
         min-height: 100vh;
         display: flex;
         justify-content: center;
         align-items: center;
         padding: 20px;
+        -webkit-font-smoothing: antialiased;
     }
 
     .container {
         width: 100%;
-        max-width: 450px;
+        max-width: 410px;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 26px;
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--text-strong);
+    }
+
+    .brand::before {
+        content: "";
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: var(--soft-sm);
     }
 
     .card {
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: var(--soft);
         overflow: hidden;
-        animation: fadeIn 0.5s ease;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(-20px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
     }
 
     .card-header {
-        background: linear-gradient(135deg, #667eea 0%);
-        padding: 40px 30px;
+        padding: 32px 34px 10px;
         text-align: center;
     }
 
     .card-header h1 {
-        color: white;
-        font-size: 28px;
-        font-weight: 600;
-        margin-bottom: 10px;
+        color: var(--text-strong);
+        font-size: 23px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-bottom: 6px;
     }
 
     .card-header p {
-        color: rgba(255, 255, 255, 0.9);
+        color: var(--text-secondary);
         font-size: 14px;
     }
 
     .card-body {
-        padding: 40px 30px;
+        padding: 26px 34px 34px;
     }
 
     .form-group {
-        margin-bottom: 25px;
+        margin-bottom: 18px;
     }
 
     .form-group label {
         display: block;
-        margin-bottom: 8px;
-        color: #333;
-        font-weight: 500;
-        font-size: 14px;
-    }
-
-    .input-group {
-        position: relative;
+        margin-bottom: 7px;
+        color: var(--text);
+        font-weight: 600;
+        font-size: 13px;
     }
 
     .input-group input {
         width: 100%;
-        padding: 12px 15px;
-        border: 2px solid #e0e0e0;
-        border-radius: 10px;
+        padding: 13px 16px;
+        border: none;
+        border-radius: var(--radius-sm);
         font-size: 14px;
-        transition: all 0.3s ease;
+        color: var(--text);
+        background: var(--well);
+        box-shadow: var(--soft-inset);
+        transition: box-shadow .18s ease;
         outline: none;
     }
 
-    .input-group input:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    .input-group input::placeholder {
+        color: var(--muted);
     }
 
-    .input-group input::placeholder {
-        color: #999;
+    .input-group input:focus {
+        box-shadow: var(--soft-inset), 0 0 0 2px var(--accent);
     }
 
     .checkbox-group {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 25px;
+        margin-bottom: 24px;
     }
 
     .checkbox-label {
@@ -182,85 +208,77 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     .checkbox-label input {
         margin-right: 8px;
         cursor: pointer;
+        accent-color: var(--accent);
     }
 
     .checkbox-label span {
-        font-size: 14px;
-        color: #666;
+        font-size: 13.5px;
+        color: var(--text-secondary);
     }
 
     .recover-link {
-        color: #667eea;
+        color: var(--accent);
         text-decoration: none;
-        font-size: 14px;
-        transition: color 0.3s ease;
+        font-size: 13.5px;
+        font-weight: 600;
+        transition: color .15s ease;
     }
 
     .recover-link:hover {
-        color: #764ba2;
         text-decoration: underline;
     }
 
     .btn-signin {
         width: 100%;
         padding: 14px;
-        background: linear-gradient(135deg, #667eea 0%);
-        color: white;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #fff;
         border: none;
-        border-radius: 10px;
-        font-size: 16px;
-        font-weight: 600;
+        border-radius: var(--radius-sm);
+        font-size: 15px;
+        font-weight: 700;
         cursor: pointer;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: var(--soft-sm);
+        transition: transform .18s ease;
     }
 
     .btn-signin:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        transform: translateY(-1px);
     }
 
     .btn-signin:active {
         transform: translateY(0);
+        box-shadow: var(--soft-inset);
     }
 
     .alert {
-        padding: 12px 15px;
-        border-radius: 10px;
+        padding: 13px 16px;
+        border-radius: var(--radius-sm);
         margin-bottom: 20px;
         font-size: 14px;
+        font-weight: 500;
+        box-shadow: var(--soft-sm);
     }
 
     .alert-danger {
-        background-color: #fee;
-        color: #c33;
-        border-left: 4px solid #c33;
-    }
-
-    .alert-success {
-        background-color: #efe;
-        color: #3c3;
-        border-left: 4px solid #3c3;
+        background: #fdeaf0;
+        color: #b4123f;
     }
 
     .footer {
         text-align: center;
-        padding: 20px;
-        background: #f8f9fa;
-        font-size: 12px;
-        color: #666;
+        margin-top: 24px;
+        font-size: 12.5px;
+        color: var(--muted);
     }
 
     @media (max-width: 480px) {
-        .card-body {
-            padding: 30px 20px;
-        }
-
         .card-header {
-            padding: 30px 20px;
+            padding: 28px 24px 10px;
         }
 
-        .card-header h1 {
-            font-size: 24px;
+        .card-body {
+            padding: 24px 24px 30px;
         }
     }
     </style>
@@ -268,10 +286,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <body>
     <div class="container">
+        <div class="brand">Gestion de Stock</div>
         <div class="card">
             <div class="card-header">
                 <h1>Connexion</h1>
-                <p>Système de Gestion de Stock</p>
+                <p>Accédez à votre espace de gestion</p>
             </div>
             <div class="card-body">
                 <?php if ($error_message): ?>
@@ -282,9 +301,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                     <div class="form-group">
-                        <label for="identifiant">Votre email</label>
+                        <label for="identifiant">Adresse email</label>
                         <div class="input-group">
-                            <input type="email" id="identifiant" name="identifiant" placeholder="Entrez votre email"
+                            <input type="email" id="identifiant" name="identifiant" placeholder="vous@exemple.com"
                                 required>
                         </div>
                     </div>
@@ -293,7 +312,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <label for="mot_de_pass">Mot de passe</label>
                         <div class="input-group">
                             <input type="password" id="mot_de_pass" name="mot_de_pass"
-                                placeholder="Entrez votre mot de passe" required>
+                                placeholder="Votre mot de passe" required>
                         </div>
                     </div>
 
@@ -305,29 +324,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <a href="recover_password.php" class="recover-link">Mot de passe oublié ?</a>
                     </div>
 
-                    <button type="submit" class="btn-signin">SE CONNECTER</button>
+                    <button type="submit" class="btn-signin">Se connecter</button>
                 </form>
             </div>
-            <div class="footer">
-                <p>&copy; 2026 - Système de Gestion de Stock. Tous droits réservés.</p>
-            </div>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 - Système de Gestion de Stock</p>
         </div>
     </div>
-
-    <script>
-    // Animation supplémentaire pour une meilleure expérience utilisateur
-    document.querySelectorAll('.input-group input').forEach(input => {
-        input.addEventListener('focus', function() {
-            this.parentElement.style.transform = 'scale(1.02)';
-        });
-        input.addEventListener('blur', function() {
-            this.parentElement.style.transform = 'scale(1)';
-        });
-    });
-
-    // Message de bienvenue en console
-    console.log('Page de connexion - Gestion de Stock');
-    </script>
 </body>
 
 </html>

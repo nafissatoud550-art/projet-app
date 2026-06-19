@@ -148,285 +148,288 @@ $bar_colors = ['blue', 'purple', 'orange', 'green', 'pink'];
 <html lang="fr">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord - Gestion de Stock</title>
-    <link rel="stylesheet" href="assets/css/app.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau de Bord - Gestion de Stock</title>
+  <link rel="stylesheet" href="assets/css/app.css">
 </head>
 
 <body>
-    <!-- Dégradés partagés pour les graphiques SVG -->
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-        <defs>
-            <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#5eead4" /><stop offset="100%" stop-color="#18bfa4" />
-            </linearGradient>
-            <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#ffc46b" /><stop offset="100%" stop-color="#ff9a5a" />
-            </linearGradient>
-            <linearGradient id="gPink" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#fb7ba2" /><stop offset="100%" stop-color="#f5577c" />
-            </linearGradient>
-            <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#7cc3ff" /><stop offset="100%" stop-color="#4f9cf9" />
-            </linearGradient>
-            <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#c4b5fd" /><stop offset="100%" stop-color="#8b5cf6" />
-            </linearGradient>
-        </defs>
-    </svg>
+  <!-- Dégradés partagés pour les graphiques SVG -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#5eead4" />
+        <stop offset="100%" stop-color="#18bfa4" />
+      </linearGradient>
+      <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ffc46b" />
+        <stop offset="100%" stop-color="#ff9a5a" />
+      </linearGradient>
+      <linearGradient id="gPink" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#fb7ba2" />
+        <stop offset="100%" stop-color="#f5577c" />
+      </linearGradient>
+      <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#7cc3ff" />
+        <stop offset="100%" stop-color="#4f9cf9" />
+      </linearGradient>
+      <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#c4b5fd" />
+        <stop offset="100%" stop-color="#8b5cf6" />
+      </linearGradient>
+    </defs>
+  </svg>
 
-    <!-- Navbar -->
-    <nav class="navbar">
-        <a href="dashboard.php" class="navbar-brand">Gestion de Stock</a>
-        <div class="navbar-right">
-            <span class="user-info">
-                Bienvenue,
-                <strong><?php echo htmlspecialchars($user_data['noms_utilisateur'] ?? 'Utilisateur'); ?></strong>
-            </span>
-            <a href="logout.php" class="btn-logout">Déconnexion</a>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="dashboard.php" class="navbar-brand">Gestion de Stock</a>
+    <div class="navbar-right">
+      <span class="user-info">
+        Bienvenue,
+        <strong><?php echo htmlspecialchars($user_data['noms_utilisateur'] ?? 'Utilisateur'); ?></strong>
+      </span>
+      <a href="logout.php" class="btn-logout">Déconnexion</a>
+    </div>
+  </nav>
+
+  <!-- Conteneur principal -->
+  <div class="container">
+    <!-- En-tête -->
+    <div class="dashboard-header">
+      <div>
+        <h1>Tableau de <strong>Bord</strong></h1>
+        <p>Vue d'ensemble de votre système de gestion de stock</p>
+      </div>
+      <div class="badge-circle" title="Alertes de stock"><?php echo $nb_alertes; ?></div>
+    </div>
+
+    <!-- Cartes KPI -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Produits en stock</span>
+          <span class="icon-chip blue"><?php icon('box'); ?></span>
         </div>
-    </nav>
-
-    <!-- Conteneur principal -->
-    <div class="container">
-        <!-- En-tête -->
-        <div class="dashboard-header">
-            <div>
-                <h1>Tableau de <strong>Bord</strong></h1>
-                <p>Vue d'ensemble de votre système de gestion de stock</p>
-            </div>
-            <div class="badge-circle" title="Alertes de stock"><?php echo $nb_alertes; ?></div>
+        <div class="kpi-value"><?php echo number_format($total_produits, 0, ',', ' '); ?></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Catégories</span>
+          <span class="icon-chip purple"><?php icon('tag'); ?></span>
         </div>
-
-        <!-- Cartes KPI -->
-        <div class="kpi-grid">
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <span class="kpi-label">Produits en stock</span>
-                    <span class="icon-chip blue"><?php icon('box'); ?></span>
-                </div>
-                <div class="kpi-value"><?php echo number_format($total_produits, 0, ',', ' '); ?></div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <span class="kpi-label">Catégories</span>
-                    <span class="icon-chip purple"><?php icon('tag'); ?></span>
-                </div>
-                <div class="kpi-value"><?php echo number_format($total_categories, 0, ',', ' '); ?></div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <span class="kpi-label">Fournisseurs</span>
-                    <span class="icon-chip orange"><?php icon('truck'); ?></span>
-                </div>
-                <div class="kpi-value"><?php echo number_format($total_fournisseurs, 0, ',', ' '); ?></div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-top">
-                    <span class="kpi-label">Valeur du stock</span>
-                    <span class="icon-chip green"><?php icon('wallet'); ?></span>
-                </div>
-                <div class="kpi-value" style="font-size:24px;">
-                    <?php echo number_format($valeur_stock, 0, ',', ' '); ?>
-                    <span style="font-size:14px;color:var(--text-secondary);font-weight:600;">FCFA</span>
-                </div>
-            </div>
+        <div class="kpi-value"><?php echo number_format($total_categories, 0, ',', ' '); ?></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Fournisseurs</span>
+          <span class="icon-chip orange"><?php icon('truck'); ?></span>
         </div>
-
-        <!-- État du stock : anneaux + jauge -->
-        <div class="row-2">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Répartition du stock</h3>
-                    <span class="badge badge-primary">Total : <?php echo $total_produits; ?></span>
-                </div>
-                <div class="card-body">
-                    <div class="ring-set">
-                        <div class="ring-item">
-                            <?php render_ring(pct($nb_ok, $total_produits), 'gGreen'); ?>
-                            <div class="ring-caption">Stock sain<small><?php echo $nb_ok; ?> produits</small></div>
-                        </div>
-                        <div class="ring-item">
-                            <?php render_ring(pct($nb_low, $total_produits), 'gOrange'); ?>
-                            <div class="ring-caption">En alerte<small><?php echo $nb_low; ?> produits</small></div>
-                        </div>
-                        <div class="ring-item">
-                            <?php render_ring(pct($nb_rupture, $total_produits), 'gPink'); ?>
-                            <div class="ring-caption">Rupture<small><?php echo $nb_rupture; ?> produits</small></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3>Santé globale du stock</h3>
-                </div>
-                <div class="card-body">
-                    <?php render_gauge(pct($nb_ok, $total_produits), 'gGreen', 'Produits au-dessus du seuil minimum'); ?>
-                    <div class="legend">
-                        <span class="legend-item"><span class="legend-dot" style="background:var(--viz-green)"></span>Sain</span>
-                        <span class="legend-item"><span class="legend-dot" style="background:var(--viz-orange)"></span>Alerte</span>
-                        <span class="legend-item"><span class="legend-dot" style="background:var(--viz-pink)"></span>Rupture</span>
-                    </div>
-                </div>
-            </div>
+        <div class="kpi-value"><?php echo number_format($total_fournisseurs, 0, ',', ' '); ?></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-top">
+          <span class="kpi-label">Valeur du stock</span>
+          <span class="icon-chip green"><?php icon('wallet'); ?></span>
         </div>
+        <div class="kpi-value" style="font-size:24px;">
+          <?php echo number_format($valeur_stock, 0, ',', ' '); ?>
+          <span style="font-size:14px;color:var(--text-secondary);font-weight:600;">FCFA</span>
+        </div>
+      </div>
+    </div>
 
-        <!-- Graphiques en barres -->
-        <div class="row-2">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Produits par catégorie</h3>
-                    <span class="badge">Top <?php echo count($cat_data); ?></span>
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($cat_data)): ?>
-                    <div class="bar-chart">
-                        <?php foreach ($cat_data as $i => $c):
+    <!-- État du stock : anneaux + jauge -->
+    <div class="row-2">
+      <div class="card">
+        <div class="card-header">
+          <h3>Répartition du stock</h3>
+          <span class="badge badge-primary">Total : <?php echo $total_produits; ?></span>
+        </div>
+        <div class="card-body">
+          <div class="ring-set">
+            <div class="ring-item">
+              <?php render_ring(pct($nb_ok, $total_produits), 'gGreen'); ?>
+              <div class="ring-caption">Stock sain<small><?php echo $nb_ok; ?> produits</small></div>
+            </div>
+            <div class="ring-item">
+              <?php render_ring(pct($nb_low, $total_produits), 'gOrange'); ?>
+              <div class="ring-caption">En alerte<small><?php echo $nb_low; ?> produits</small></div>
+            </div>
+            <div class="ring-item">
+              <?php render_ring(pct($nb_rupture, $total_produits), 'gPink'); ?>
+              <div class="ring-caption">Rupture<small><?php echo $nb_rupture; ?> produits</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Santé globale du stock</h3>
+        </div>
+        <div class="card-body">
+          <?php render_gauge(pct($nb_ok, $total_produits), 'gGreen', 'Produits au-dessus du seuil minimum'); ?>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-dot" style="background:var(--viz-green)"></span>Sain</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--viz-orange)"></span>Alerte</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--viz-pink)"></span>Rupture</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphiques en barres -->
+    <div class="row-2">
+      <div class="card">
+        <div class="card-header">
+          <h3>Produits par catégorie</h3>
+          <span class="badge">Top <?php echo count($cat_data); ?></span>
+        </div>
+        <div class="card-body">
+          <?php if (!empty($cat_data)): ?>
+          <div class="bar-chart">
+            <?php foreach ($cat_data as $i => $c):
                             $h = (int) round($c['cnt'] / $max_cat * 100);
                             $col = $bar_colors[$i % count($bar_colors)];
                         ?>
-                        <div class="bar-col">
-                            <span class="bar-val"><?php echo (int) $c['cnt']; ?></span>
-                            <div class="bar <?php echo $col; ?>" style="height: <?php echo max(4, $h); ?>%;"></div>
-                            <span class="bar-label"><?php echo htmlspecialchars($c['nom'] ?? '—'); ?></span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php else: ?>
-                    <div class="empty-message">Aucune catégorie à afficher.</div>
-                    <?php endif; ?>
-                </div>
+            <div class="bar-col">
+              <span class="bar-val"><?php echo (int) $c['cnt']; ?></span>
+              <div class="bar <?php echo $col; ?>" style="height: <?php echo max(4, $h); ?>%;"></div>
+              <span class="bar-label"><?php echo htmlspecialchars($c['nom'] ?? '—'); ?></span>
             </div>
+            <?php endforeach; ?>
+          </div>
+          <?php else: ?>
+          <div class="empty-message">Aucune catégorie à afficher.</div>
+          <?php endif; ?>
+        </div>
+      </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h3>Approvisionnements par mois</h3>
-                    <span class="badge">6 derniers</span>
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($mois_data)): ?>
-                    <div class="bar-chart">
-                        <?php foreach ($mois_data as $m):
+      <div class="card">
+        <div class="card-header">
+          <h3>Approvisionnements par mois</h3>
+          <span class="badge">6 derniers</span>
+        </div>
+        <div class="card-body">
+          <?php if (!empty($mois_data)): ?>
+          <div class="bar-chart">
+            <?php foreach ($mois_data as $m):
                             $h = (int) round($m['cnt'] / $max_mois * 100);
                         ?>
-                        <div class="bar-col">
-                            <span class="bar-val"><?php echo (int) $m['cnt']; ?></span>
-                            <div class="bar blue" style="height: <?php echo max(4, $h); ?>%;"></div>
-                            <span class="bar-label"><?php echo htmlspecialchars($m['mois']); ?></span>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php else: ?>
-                    <div class="empty-message">Aucun approvisionnement à afficher.</div>
-                    <?php endif; ?>
-                </div>
+            <div class="bar-col">
+              <span class="bar-val"><?php echo (int) $m['cnt']; ?></span>
+              <div class="bar blue" style="height: <?php echo max(4, $h); ?>%;"></div>
+              <span class="bar-label"><?php echo htmlspecialchars($m['mois']); ?></span>
             </div>
+            <?php endforeach; ?>
+          </div>
+          <?php else: ?>
+          <div class="empty-message">Aucun approvisionnement à afficher.</div>
+          <?php endif; ?>
         </div>
+      </div>
+    </div>
 
-        <!-- Alertes + actions rapides -->
-        <div class="content-grid">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Alertes de stock</h3>
-                    <span class="badge badge-warning"><?php echo $nb_alertes; ?> à surveiller</span>
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($stock_bas)): ?>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Produit</th>
-                                    <th>Stock</th>
-                                    <th>Min</th>
-                                    <th>Statut</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($stock_bas as $row):
+    <!-- Alertes + actions rapides -->
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <h3>Alertes de stock</h3>
+          <span class="badge badge-warning"><?php echo $nb_alertes; ?> à surveiller</span>
+        </div>
+        <div class="card-body">
+          <?php if (!empty($stock_bas)): ?>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th>Stock</th>
+                  <th>Min</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($stock_bas as $row):
                                     $rupture = ((int) $row['quantite'] <= 0);
                                 ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($row['nom_produit']); ?></td>
-                                    <td><strong><?php echo (int) $row['quantite']; ?></strong></td>
-                                    <td><?php echo (int) $row['stock_minimum']; ?></td>
-                                    <td>
-                                        <span class="status-badge danger">
-                                            <span class="stock-dot red"></span>
-                                            <?php echo $rupture ? 'Rupture' : 'Stock bas'; ?>
-                                        </span>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <?php else: ?>
-                    <div class="empty-message">Tous les produits ont un stock suffisant.</div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3>Actions rapides</h3>
-                </div>
-                <div class="card-body">
-                    <div class="quick-actions">
-                        <a href="ajouter_produit.php" class="quick-action-btn">Ajouter un produit</a>
-                        <a href="approvisionnement.php" class="quick-action-btn">Approvisionnement</a>
-                        <a href="categorie.php" class="quick-action-btn">Catégories</a>
-                        <a href="fournisseur.php" class="quick-action-btn">Fournisseurs</a>
-                        <a href="sortie.php" class="quick-action-btn" style="grid-column:1 / -1;">Gérer les sorties</a>
-                    </div>
-                </div>
-            </div>
+                <tr>
+                  <td><?php echo htmlspecialchars($row['nom_produit']); ?></td>
+                  <td><strong><?php echo (int) $row['quantite']; ?></strong></td>
+                  <td><?php echo (int) $row['stock_minimum']; ?></td>
+                  <td>
+                    <span class="status-badge danger">
+                      <span class="stock-dot red"></span>
+                      <?php echo $rupture ? 'Rupture' : 'Stock bas'; ?>
+                    </span>
+                  </td>
+                </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+          <?php else: ?>
+          <div class="empty-message">Tous les produits ont un stock suffisant.</div>
+          <?php endif; ?>
         </div>
+      </div>
 
-        <!-- Derniers approvisionnements -->
-        <div class="card">
-            <div class="card-header">
-                <h3>Derniers approvisionnements</h3>
-                <span class="badge">Historique</span>
-            </div>
-            <div class="card-body">
-                <?php if (!empty($dern_appro)): ?>
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nom</th>
-                                <th>Date</th>
-                                <th>Utilisateur</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($dern_appro as $row): ?>
-                            <tr>
-                                <td><span class="badge badge-primary">#<?php echo (int) $row['Id_approvisionnement']; ?></span></td>
-                                <td><?php echo htmlspecialchars($row['nom_approvisionnement']); ?></td>
-                                <td><?php echo date('d/m/Y', strtotime($row['Date_approvisionnement'])); ?></td>
-                                <td><?php echo htmlspecialchars($row['noms_utilisateur']); ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php else: ?>
-                <div class="empty-message">Aucun approvisionnement enregistré.</div>
-                <?php endif; ?>
-            </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>Actions rapides</h3>
         </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p>&copy; 2026 - Système de Gestion de Stock. Tous droits réservés.</p>
+        <div class="card-body">
+          <div class="quick-actions">
+            <a href="ajouter_produit.php" class="quick-action-btn">Ajouter un produit</a>
+            <a href="approvisionnement.php" class="quick-action-btn">Approvisionnement</a>
+            <a href="categorie.php" class="quick-action-btn">Catégories</a>
+            <a href="fournisseur.php" class="quick-action-btn">Fournisseurs</a>
+            <a href="sortie.php" class="quick-action-btn" style="grid-column:1 / -1;">Gérer les sorties</a>
+          </div>
         </div>
+      </div>
     </div>
+
+    <!-- Derniers approvisionnements -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Derniers approvisionnements</h3>
+        <span class="badge">Historique</span>
+      </div>
+      <div class="card-body">
+        <?php if (!empty($dern_appro)): ?>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nom</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($dern_appro as $row): ?>
+              <tr>
+                <td><span class="badge badge-primary">#<?php echo (int) $row['Id_approvisionnement']; ?></span></td>
+                <td><?php echo htmlspecialchars($row['nom_approvisionnement']); ?></td>
+                <td><?php echo date('d/m/Y', strtotime($row['Date_approvisionnement'])); ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php else: ?>
+        <div class="empty-message">Aucun approvisionnement enregistré.</div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>&copy; 2026 - Système de Gestion de Stock. Tous droits réservés.</p>
+    </div>
+  </div>
 </body>
 
 </html>
